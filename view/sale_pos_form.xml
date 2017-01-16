@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<!-- This file is part sale_pos module for Tryton.
+The COPYRIGHT file at the top level of this repository contains the full copyright notices and license terms. -->
+<data>
+    <xpath expr="/form/group[@id= 'cash']/button[@name='wizard_sale_payment']" position="after">
+
+        <button name="warehouse_stock" string="Stock de productos"
+            icon="tryton-list-add"/>
+    </xpath>
+</data>

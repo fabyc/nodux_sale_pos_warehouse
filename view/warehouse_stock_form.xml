@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<!-- This file is part nodux_sale_payment module for Tryton.
+The COPYRIGHT file at the top level of this repository contains the full copyright notices and license terms. -->
+
+<form string="Stock de productos" >
+
+    <newline/>
+    <notebook colspan="3">
+        <page string="Stock de productos" id="producto">
+            <field name="producto"/>
+            <newline/>
+            <field name="lines" colspan="3"
+                view_ids="nodux_sale_pos_warehouse.product_line_view_tree_sequence"/>
+            <newline/>
+            <field name="all_list_price" colspan="1"
+                view_ids="nodux_sale_pos.list_price_line_view_tree"/>
+            <field name="warehouse_sale" colspan="2"
+                view_ids="nodux_sale_pos.warehouse_line_view_tree"/>
+            <newline/>
+        </page>
+    </notebook>
+</form>
