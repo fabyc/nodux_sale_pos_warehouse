@@ -158,7 +158,7 @@ class WarehouseStock(ModelView):
                         changes['all_list_price'].setdefault('add', []).append((0, result_list))
 
                     for lo in location:
-                        in_stock = Move.search_count([('product', '=',  lone.product), ('to_location','=', lo.storage_location)])
+                        in_stock = Move.search_count([('product', '=',  line.product), ('to_location','=', lo.storage_location)])
                         move = Move.search_count([('product', '=', line.product), ('from_location','=', lo.storage_location)])
 
                         s_total = in_stock - move
