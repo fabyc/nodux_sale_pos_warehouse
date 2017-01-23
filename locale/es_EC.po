@@ -124,7 +124,7 @@ msgstr ""
 
 msgctxt "model:nodux_sale_pos_warehouse.warehouse,name:"
 msgid "Warehouse Stock"
-msgstr ""
+msgstr "Stock de Bodegas"
 
 msgctxt "model:product.product.line,name:"
 msgid "Product Line"
@@ -136,7 +136,7 @@ msgstr "Bodega"
 
 msgctxt "wizard_button:nodux_sale_pos_warehouse.warehouse_stock,start,add_:"
 msgid "Add"
-msgstr "Agregar"
+msgstr "Añadir"
 
 msgctxt "wizard_button:nodux_sale_pos_warehouse.warehouse_stock,start,end:"
 msgid "Close"
