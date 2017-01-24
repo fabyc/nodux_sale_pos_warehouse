@@ -9,6 +9,7 @@ from trytond.pyson import Bool, Eval, Not
 from trytond.transaction import Transaction
 from trytond.wizard import Wizard, StateView, StateTransition, Button, StateAction
 from trytond import backend
+from trytond.tools import grouped_slice
 
 __all__ = ['Sale', 'WarehouseStock', 'WizardWarehouseStock', 'ProductLine']
 __metaclass__ = PoolMeta
@@ -41,6 +42,7 @@ class ProductLine(ModelView, ModelSQL):
     precio_venta = fields.Numeric('Precio Venta')
     total_stock = fields.Integer('Total Stock')
     add = fields.Boolean('Agregar en Venta')
+    quantity = fields.Numeric('Cantidad')
 
 class WarehouseStock(ModelView):
     'Warehouse Stock'
@@ -49,11 +51,6 @@ class WarehouseStock(ModelView):
     lines = fields.One2Many('product.product.line', None, 'Lines')
     all_list_price = fields.One2Many('sale.list_by_product', 'sale', 'Price List', readonly=True)
     warehouse_sale =fields.One2Many('sale.warehouse', 'sale', 'Productos por bodega', readonly=True)
-    value = fields.Char('Seleccionado')
-
-    @staticmethod
-    def default_value():
-        return ""
 
     @fields.depends('producto', 'lines')
     def on_change_producto(self):
@@ -75,20 +72,18 @@ class WarehouseStock(ModelView):
         if not self.producto:
             return res
 
-        code = self.producto
+        code = self.producto+'%'
         name = self.producto+'%'
 
-        products = Product.search([('code', '=', code)])
+        products = Product.search([('code', 'like', code)])
         if products:
             for product in products:
                 stock_total = 0
-
                 for lo in location:
                     in_stock = Move.search_count([('product', '=',  product), ('to_location','=', lo.storage_location)])
                     move = Move.search_count([('product', '=', product), ('from_location','=', lo.storage_location)])
                     s_total = in_stock - move
                     stock_total += s_total
-
                 product_line = {
                     'product': product.id,
                     'precio_venta':product.list_price,
@@ -97,17 +92,14 @@ class WarehouseStock(ModelView):
                 res['lines'].setdefault('add', []).append((0, product_line))
         else:
             products = Product.search([('name', 'ilike', name)])
-
             for product in products:
                 stock_total = 0
-
                 for lo in location:
                     in_stock = Move.search_count([('product', '=',  product), ('to_location','=', lo.storage_location)])
                     move = Move.search_count([('product', '=', product), ('from_location','=', lo.storage_location)])
 
                     s_total = in_stock - move
                     stock_total += s_total
-
                 product_line = {
                     'product': product.id,
                     'precio_venta':product.list_price,
@@ -146,9 +138,23 @@ class WarehouseStock(ModelView):
         if self.all_list_price:
             changes['all_list_price']['remove'] = [x['id'] for x in self.all_list_price]
 
+        cont = 0
         if self.lines:
             for line in self.lines:
+                cont += 1
                 if line.revisar == True:
+                    result_line = {
+                        'revisar': False,
+                        'product': line.product.id,
+                        'precio_venta':line.precio_venta,
+                        'total_stock':line.total_stock,
+                        'add' : line.add,
+                        'quantity' : line.quantity,
+                    }
+                    changes['lines']['remove'] = [line['id']]
+
+                    changes['lines'].setdefault('add', []).append((cont-1, result_line))
+
                     for list_p in line.product.listas_precios:
                         result_list = {
                             'lista_precio': list_p.lista_precio.name,
@@ -199,7 +205,10 @@ class WizardWarehouseStock(Wizard):
                 line.taxes = update['taxes']
                 line.gross_unit_price_wo_round = update['gross_unit_price_wo_round']
                 line.description = update['description']
-                line.quantity = 1
+                if line_add.quantity:
+                    line.quantity = line_add.quantity
+                else:
+                    line.quantity = 1
                 line.sale = sale
                 line.save()
 
