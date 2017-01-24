@@ -8,4 +8,5 @@ the full copyright notices and license terms. -->
     <field name="precio_venta"/>
     <field name="total_stock"/>
     <field name="add"/>
+    <field name="quantity"/>
 </tree>
