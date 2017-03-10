@@ -9,6 +9,8 @@ def register():
         Sale,
         WarehouseStock,
         ProductLine,
+        SaleWarehouse,
+        SalePriceList,
         module='nodux_sale_pos_warehouse', type_='model')
     Pool.register(
         WizardWarehouseStock,

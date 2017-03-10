@@ -11,7 +11,8 @@ from trytond.wizard import Wizard, StateView, StateTransition, Button, StateActi
 from trytond import backend
 from trytond.tools import grouped_slice
 
-__all__ = ['Sale', 'WarehouseStock', 'WizardWarehouseStock', 'ProductLine']
+__all__ = ['Sale', 'WarehouseStock', 'WizardWarehouseStock', 'ProductLine',
+'SaleWarehouse', 'SalePriceList']
 __metaclass__ = PoolMeta
 _ZERO = Decimal('0.0')
 
@@ -31,6 +32,24 @@ class Sale():
     @ModelView.button_action('nodux_sale_pos_warehouse.warehouse_stock')
     def warehouse_stock(cls, sales):
         pass
+
+class SaleWarehouse(ModelView, ModelSQL):
+    'Producto por Bodega'
+    __name__ = 'sale.warehouse'
+
+    sale = fields.Many2One('sale.sale', 'Sale', readonly = True)
+    product = fields.Char('Producto',  readonly = True)
+    warehouse = fields.Char('Bodega',  readonly = True)
+    quantity = fields.Char('Cantidad', readonly = True)
+
+class SalePriceList(ModelView, ModelSQL):
+    'Sale Price List'
+    __name__ = 'sale.list_by_product'
+
+    sale = fields.Many2One('sale.sale', 'Sale', readonly = True)
+    lista_precio = fields.Char('Lista de Precio')
+    fijo = fields.Numeric('Precio sin IVA', digits=(16, 6))
+    fijo_con_iva = fields.Numeric('Precio con IVA', digits=(16, 6))
 
 class ProductLine(ModelView, ModelSQL):
     'Product Line'
@@ -78,21 +97,24 @@ class WarehouseStock(ModelView):
         products = Product.search([('code', 'like', code)])
         if products:
             for product in products:
+
                 stock_total = 0
                 for lo in location:
                     in_stock = Move.search_count([('product', '=',  product), ('to_location','=', lo.storage_location)])
                     move = Move.search_count([('product', '=', product), ('from_location','=', lo.storage_location)])
                     s_total = in_stock - move
                     stock_total += s_total
+
                 product_line = {
                     'product': product.id,
-                    'precio_venta':product.list_price,
-                    'total_stock':stock_total,
+                    #'precio_venta':product.list_price,
+                    #'total_stock':stock_total,
                 }
                 res['lines'].setdefault('add', []).append((0, product_line))
         else:
             products = Product.search([('name', 'ilike', name)])
             for product in products:
+
                 stock_total = 0
                 for lo in location:
                     in_stock = Move.search_count([('product', '=',  product), ('to_location','=', lo.storage_location)])
@@ -100,13 +122,14 @@ class WarehouseStock(ModelView):
 
                     s_total = in_stock - move
                     stock_total += s_total
+
                 product_line = {
                     'product': product.id,
-                    'precio_venta':product.list_price,
-                    'total_stock':stock_total,
+                    #'precio_venta':product.list_price,
+                    #'total_stock':stock_total,
                 }
                 res['lines'].setdefault('add', []).append((0, product_line))
-
+        print "res ", res
         return res
 
 
@@ -146,10 +169,10 @@ class WarehouseStock(ModelView):
                     result_line = {
                         'revisar': False,
                         'product': line.product.id,
-                        'precio_venta':line.precio_venta,
-                        'total_stock':line.total_stock,
-                        'add' : line.add,
-                        'quantity' : line.quantity,
+                        'precio_venta': line.precio_venta,
+                        'total_stock': line.total_stock,
+                        'add': line.add,
+                        'quantity': line.quantity,
                     }
                     changes['lines']['remove'] = [line['id']]
 
@@ -193,7 +216,8 @@ class WizardWarehouseStock(Wizard):
     add_ = StateTransition()
 
     def add_lines(self):
-        Line = Pool().get('sale.line')
+        pool = Pool()
+        Line = pool.get('sale.line')
         for line_add in self.start.lines:
             if line_add.add == True:
                 sale = Transaction().context.get('active_id', False)
@@ -213,5 +237,5 @@ class WizardWarehouseStock(Wizard):
                 line.save()
 
     def transition_add_(self):
-            self.add_lines()
-            return 'end'
+        self.add_lines()
+        return 'end'
