@@ -107,8 +107,8 @@ class WarehouseStock(ModelView):
 
                 product_line = {
                     'product': product.id,
-                    #'precio_venta':product.list_price,
-                    #'total_stock':stock_total,
+                    'precio_venta':product.list_price,
+                    'total_stock':stock_total,
                 }
                 res['lines'].setdefault('add', []).append((0, product_line))
         else:
@@ -125,8 +125,8 @@ class WarehouseStock(ModelView):
 
                 product_line = {
                     'product': product.id,
-                    #'precio_venta':product.list_price,
-                    #'total_stock':stock_total,
+                    'precio_venta':product.list_price,
+                    'total_stock':stock_total,
                 }
                 res['lines'].setdefault('add', []).append((0, product_line))
         print "res ", res
