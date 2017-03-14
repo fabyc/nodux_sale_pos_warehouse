@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<!-- This file is part sale_pos module for Tryton.
+The COPYRIGHT file at the top level of this repository contains the full copyright notices and license terms. -->
+<tree string="Productos por bodega">
+    <field name="product" tree_invisible="1"/>
+    <field name="warehouse"/>
+    <field name="quantity"/>
+</tree>

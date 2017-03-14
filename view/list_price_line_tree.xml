@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<!-- This file is part sale_pos module for Tryton.
+The COPYRIGHT file at the top level of this repository contains the full copyright notices and license terms. -->
+<tree string="Listas de Precio">
+    <field name="lista_precio"/>
+    <field name="fijo"/>
+    <field name="fijo_con_iva"/>
+</tree>

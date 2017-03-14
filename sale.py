@@ -9,8 +9,10 @@ from trytond.pyson import Bool, Eval, Not
 from trytond.transaction import Transaction
 from trytond.wizard import Wizard, StateView, StateTransition, Button, StateAction
 from trytond import backend
+from trytond.tools import grouped_slice
 
-__all__ = ['Sale', 'WarehouseStock', 'WizardWarehouseStock', 'ProductLine']
+__all__ = ['Sale', 'WarehouseStock', 'WizardWarehouseStock', 'ProductLine',
+'SaleWarehouse', 'SalePriceList']
 __metaclass__ = PoolMeta
 _ZERO = Decimal('0.0')
 
@@ -31,6 +33,24 @@ class Sale():
     def warehouse_stock(cls, sales):
         pass
 
+class SaleWarehouse(ModelView, ModelSQL):
+    'Producto por Bodega'
+    __name__ = 'sale.warehouse'
+
+    sale = fields.Many2One('sale.sale', 'Sale', readonly = True)
+    product = fields.Char('Producto',  readonly = True)
+    warehouse = fields.Char('Bodega',  readonly = True)
+    quantity = fields.Char('Cantidad', readonly = True)
+
+class SalePriceList(ModelView, ModelSQL):
+    'Sale Price List'
+    __name__ = 'sale.list_by_product'
+
+    sale = fields.Many2One('sale.sale', 'Sale', readonly = True)
+    lista_precio = fields.Char('Lista de Precio')
+    fijo = fields.Numeric('Precio sin IVA', digits=(16, 6))
+    fijo_con_iva = fields.Numeric('Precio con IVA', digits=(16, 6))
+
 class ProductLine(ModelView, ModelSQL):
     'Product Line'
     __name__ = 'product.product.line'
@@ -41,6 +61,7 @@ class ProductLine(ModelView, ModelSQL):
     precio_venta = fields.Numeric('Precio Venta')
     total_stock = fields.Integer('Total Stock')
     add = fields.Boolean('Agregar en Venta')
+    quantity = fields.Numeric('Cantidad')
 
 class WarehouseStock(ModelView):
     'Warehouse Stock'
@@ -49,17 +70,15 @@ class WarehouseStock(ModelView):
     lines = fields.One2Many('product.product.line', None, 'Lines')
     all_list_price = fields.One2Many('sale.list_by_product', 'sale', 'Price List', readonly=True)
     warehouse_sale =fields.One2Many('sale.warehouse', 'sale', 'Productos por bodega', readonly=True)
-    value = fields.Char('Seleccionado')
-
-    @staticmethod
-    def default_value():
-        return ""
 
     @fields.depends('producto', 'lines')
     def on_change_producto(self):
         pool = Pool()
         Product = pool.get('product.product')
         Location = pool.get('stock.location')
+        Lines = pool.get('product.product.line')
+        product_line = Lines()
+        lines = []
         location = Location.search([('type', '=', 'warehouse')])
         Move = pool.get('stock.move')
         in_s = 0
@@ -67,40 +86,37 @@ class WarehouseStock(ModelView):
         s_total = 0
         stock_total = 0
 
-        res = {}
-        res['lines'] = {}
         if self.lines:
-            res['lines']['remove'] = [x['id'] for x in self.lines]
+            self.lines = lines
 
         if not self.producto:
-            return res
+            return
 
-        code = self.producto
+        code = self.producto+'%'
         name = self.producto+'%'
 
-        products = Product.search([('code', '=', code)])
+        products = Product.search([('code', 'like', code)])
         if products:
             for product in products:
-                stock_total = 0
 
+                stock_total = 0
                 for lo in location:
                     in_stock = Move.search_count([('product', '=',  product), ('to_location','=', lo.storage_location)])
                     move = Move.search_count([('product', '=', product), ('from_location','=', lo.storage_location)])
                     s_total = in_stock - move
                     stock_total += s_total
 
-                product_line = {
-                    'product': product.id,
-                    'precio_venta':product.list_price,
-                    'total_stock':stock_total,
-                }
-                res['lines'].setdefault('add', []).append((0, product_line))
+                product_line.product = product.id
+                product_line.precio_venta = product.list_price
+                product_line.total_stock = stock_total
+
+                lines.append(product_line)
         else:
+            print "Ingresa aqui "
             products = Product.search([('name', 'ilike', name)])
-
             for product in products:
-                stock_total = 0
 
+                stock_total = 0
                 for lo in location:
                     in_stock = Move.search_count([('product', '=',  product), ('to_location','=', lo.storage_location)])
                     move = Move.search_count([('product', '=', product), ('from_location','=', lo.storage_location)])
@@ -108,14 +124,13 @@ class WarehouseStock(ModelView):
                     s_total = in_stock - move
                     stock_total += s_total
 
-                product_line = {
-                    'product': product.id,
-                    'precio_venta':product.list_price,
-                    'total_stock':stock_total,
-                }
-                res['lines'].setdefault('add', []).append((0, product_line))
+                product_line.product = product.id
+                product_line.precio_venta = product.list_price
+                product_line.total_stock = stock_total
 
-        return res
+                lines.append(product_line)
+                print "Lineas ", lines
+        self.lines = lines
 
 
     @fields.depends('lines', 'all_list_price', 'warehouse_sale', 'producto')
@@ -135,44 +150,60 @@ class WarehouseStock(ModelView):
         Invoice = pool.get('account.invoice')
         Configuration = pool.get('account.configuration')
         config = Configuration(1)
+        ProductLine = pool.get('product.product.line')
+        ListbyProduct = pool.get('sale.list_by_product')
+        SaleWarehouse = pool.get('sale.warehouse')
 
-        changes = {}
-        changes['all_list_price'] = {}
-        changes['warehouse_sale'] = {}
-        changes['lines'] = {}
+        warehouse_sale = []
+        all_list_price = []
+        lines = []
 
         if self.warehouse_sale:
-            changes['warehouse_sale']['remove'] = [x['id'] for x in self.warehouse_sale]
+            self.warehouse_sale = warehouse_sale
         if self.all_list_price:
-            changes['all_list_price']['remove'] = [x['id'] for x in self.all_list_price]
+            self.all_list_price = all_list_price
 
+        cont = 0
         if self.lines:
             for line in self.lines:
+                cont += 1
                 if line.revisar == True:
+                    result_line = ProductLine()
+                    result_line.revisar = False
+                    result_line.product = line.product.id
+                    result_line.precio_venta = line.precio_venta
+                    result_line.total_stock = line.total_stock
+                    result_line.add = line.add
+                    result_line.quantity = line.quantity
+                    line.revisar = False
+                    #changes['lines']['remove'] = [line['id']]
+
+                    #changes['lines'].setdefault('add', []).append((cont-1, result_line))
+
                     for list_p in line.product.listas_precios:
-                        result_list = {
-                            'lista_precio': list_p.lista_precio.name,
-                            'fijo': list_p.fijo,
-                            'fijo_con_iva': list_p.fijo_con_iva,
-                        }
-                        changes['all_list_price'].setdefault('add', []).append((0, result_list))
+                        result_list = ListbyProduct()
+                        result_list.lista_precio = list_p.lista_precio.name
+                        result_list.fijo = list_p.fijo
+                        result_list.fijo_con_iva = list_p.fijo_con_iva
+                        all_list_price.append(result_list)
 
                     for lo in location:
-                        in_stock = Move.search_count([('product', '=',  lone.product), ('to_location','=', lo.storage_location)])
+                        in_stock = Move.search_count([('product', '=',  line.product), ('to_location','=', lo.storage_location)])
                         move = Move.search_count([('product', '=', line.product), ('from_location','=', lo.storage_location)])
 
                         s_total = in_stock - move
 
-                        result = {
-                            'product': line.product.name,
-                            'warehouse': lo.name,
-                            'quantity': str(int(s_total)),
-                        }
+                        result = SaleWarehouse()
+                        result.product = line.product.name
+                        result.warehouse = lo.name
+                        result.quantity = str(int(s_total))
+
                         stock = 0
                         in_s = 0
-                        changes['warehouse_sale'].setdefault('add', []).append((0, result))
+                        warehouse_sale.append(result)
 
-        return changes
+        self.warehouse_sale = warehouse_sale
+        self.all_list_price = all_list_price
 
 class WizardWarehouseStock(Wizard):
     'Wizard Warehouse Stock'
@@ -187,7 +218,8 @@ class WizardWarehouseStock(Wizard):
     add_ = StateTransition()
 
     def add_lines(self):
-        Line = Pool().get('sale.line')
+        pool = Pool()
+        Line = pool.get('sale.line')
         for line_add in self.start.lines:
             if line_add.add == True:
                 sale = Transaction().context.get('active_id', False)
@@ -199,10 +231,13 @@ class WizardWarehouseStock(Wizard):
                 line.taxes = update['taxes']
                 line.gross_unit_price_wo_round = update['gross_unit_price_wo_round']
                 line.description = update['description']
-                line.quantity = 1
+                if line_add.quantity:
+                    line.quantity = line_add.quantity
+                else:
+                    line.quantity = 1
                 line.sale = sale
                 line.save()
 
     def transition_add_(self):
-            self.add_lines()
-            return 'end'
+        self.add_lines()
+        return 'end'
